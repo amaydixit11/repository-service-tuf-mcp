@@ -254,7 +254,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'update_config': {
         const payload = args?.payload;
         if (!payload) throw new Error('Missing required argument: payload');
-        const response = await client.putConfig(payload);
+        const response = await client.putConfig(payload) as any;
+        if (response.taskId) {
+          const result = await client.waitForTask(response.taskId);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          };
+        }
         return {
           content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
         };
@@ -273,6 +279,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           response = await client.postDelegationDelete(payload);
         } else {
           throw new Error(`Invalid action: ${action}. Must be 'create', 'update', or 'delete'.`);
+        }
+
+        const taskResponse = response as any;
+        if (taskResponse.taskId) {
+          const result = await client.waitForTask(taskResponse.taskId);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          };
         }
 
         return {

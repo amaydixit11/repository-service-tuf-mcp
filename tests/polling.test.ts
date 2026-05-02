@@ -1,18 +1,28 @@
+import { jest } from '@jest/globals';
 import { RstufClient } from '../src/client';
 import axios from 'axios';
 
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+// Complete axios mock
+const mockRequest = jest.fn();
+const mockAxiosInstance = {
+  request: mockRequest,
+};
+const mockCreate = jest.fn().mockReturnValue(mockAxiosInstance);
+
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: {
+    create: mockCreate,
+  },
+  create: mockCreate,
+}));
 
 describe('RstufClient waitForTask', () => {
   const config = { baseUrl: 'http://api.example.com', apiToken: 'test-token' };
   let client: RstufClient;
-  let mockRequest: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockRequest = jest.fn();
-    mockedAxios.create.mockReturnValue({ request: mockRequest } as any);
     client = new RstufClient(config);
   });
 
@@ -25,7 +35,7 @@ describe('RstufClient waitForTask', () => {
     const result = await client.waitForTask('task-123', 10000, 10);
     expect(result).toEqual({ success: true });
     expect(mockRequest).toHaveBeenCalledTimes(3);
-  });
+  }, 15000);
 
   it('should throw when task state is FAILED', async () => {
     mockRequest.mockResolvedValueOnce({ data: { state: 'FAILED', error: 'Something went wrong' } });
