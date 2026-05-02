@@ -25,7 +25,8 @@
   "homepage": "https://github.com/amaydixit11/repository-service-tuf-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "axios": "^1.15.2"
+    "axios": "^1.15.2",
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@types/axios": "^0.9.36",

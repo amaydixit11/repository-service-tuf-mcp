@@ -1,11 +1,16 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { RstufClient, TaskResponse } from './client.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { RstufClient, type TaskResponse } from './client.js';
 
+// Load .env file before reading environment variables
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const dotenv = require('dotenv');
+dotenv.config();
+
+const baseUrl = process.env.RSTUF_API_URL;
+const apiToken = process.env.RSTUF_API_TOKEN;
 const server = new Server(
   {
     name: 'repository-service-tuf-mcp',
@@ -19,8 +24,7 @@ const server = new Server(
 );
 
 // Config from env - Eager validation
-const baseUrl = process.env.RSTUF_API_URL;
-const apiToken = process.env.RSTUF_API_TOKEN;
+
 
 if (!baseUrl || !apiToken) {
   console.error('FATAL: RSTUF_API_URL and RSTUF_API_TOKEN environment variables must be set');
