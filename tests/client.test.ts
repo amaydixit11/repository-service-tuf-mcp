@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { RstufClient } from '../src/client';
+import { RstufClient } from '../src/client.js';
 import axios from 'axios';
 
 // Complete axios mock
@@ -15,6 +15,7 @@ jest.mock('axios', () => ({
     create: mockCreate,
   },
   create: mockCreate,
+  isAxiosError: (err: any) => err.__isAxiosError === true,
 }));
 
 describe('RstufClient', () => {
@@ -28,7 +29,7 @@ describe('RstufClient', () => {
 
   it('should call getBootstrapStatus correctly', async () => {
     const mockData = { status: 'initialized' };
-    mockRequest.mockResolvedValueOnce({ data: mockData });
+    (mockRequest as any).mockResolvedValueOnce({ data: mockData });
     
     const result = await client.getBootstrapStatus();
     expect(result).toEqual(mockData);
@@ -42,7 +43,7 @@ describe('RstufClient', () => {
     const mockResponse = { taskId: 'task-123' };
     const payload = { repoName: 'test-repo' };
     
-    mockRequest.mockResolvedValueOnce({ data: mockResponse });
+    (mockRequest as any).mockResolvedValueOnce({ data: mockResponse });
     
     const result = await client.postBootstrap(payload);
     

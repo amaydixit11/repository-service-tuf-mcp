@@ -4,7 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { RstufClient } from './client.js';
+import { RstufClient, TaskResponse } from './client.js';
 
 const server = new Server(
   {
@@ -18,9 +18,15 @@ const server = new Server(
   }
 );
 
-// Config from env
-const baseUrl = process.env.RSTUF_API_URL || 'http://localhost:8080';
-const apiToken = process.env.RSTUF_API_TOKEN || 'default-token';
+// Config from env - Eager validation
+const baseUrl = process.env.RSTUF_API_URL;
+const apiToken = process.env.RSTUF_API_TOKEN;
+
+if (!baseUrl || !apiToken) {
+  console.error('FATAL: RSTUF_API_URL and RSTUF_API_TOKEN environment variables must be set');
+  process.exit(1);
+}
+
 const client = new RstufClient({ baseUrl, apiToken });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -83,6 +89,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ['payload'],
+        },
+      },
+      {
+        name: 'deploy_artifacts',
+        description: 'Workflow: Add artifacts and then publish them in one operation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            artifacts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  version: { type: 'string' },
+                  hash: { type: 'string' },
+                  size: { type: 'number' },
+                },
+                required: ['name', 'version', 'hash', 'size'],
+              },
+            },
+            publishPayload: {
+              type: 'object',
+              description: 'Payload for publishing the artifacts after adding them',
+            },
+          },
+          required: ['artifacts', 'publishPayload'],
         },
       },
       {
@@ -172,9 +205,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'initialize_repository': {
         const payload = args?.payload;
         if (!payload) throw new Error('Missing required argument: payload');
-        const response = await client.postBootstrap(payload) as any;
-        if (response.taskId) {
-          const result = await client.waitForTask(response.taskId);
+        const response = await client.postBootstrap(payload);
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
@@ -187,9 +220,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'add_artifacts': {
         const artifacts = args?.artifacts;
         if (!artifacts) throw new Error('Missing required argument: artifacts');
-        const response = await client.postArtifacts({ artifacts }) as any;
-        if (response.taskId) {
-          const result = await client.waitForTask(response.taskId);
+        const response = await client.postArtifacts({ artifacts });
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
@@ -202,9 +235,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'publish_artifacts': {
         const payload = args?.payload;
         if (!payload) throw new Error('Missing required argument: payload');
-        const response = await client.postArtifactsPublish(payload) as any;
-        if (response.taskId) {
-          const result = await client.waitForTask(response.taskId);
+        const response = await client.postArtifactsPublish(payload);
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
@@ -214,12 +247,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'deploy_artifacts': {
+        const { artifacts, publishPayload } = args || {};
+        if (!artifacts || !publishPayload) throw new Error('Missing required arguments: artifacts and publishPayload');
+
+        // Step 1: Add artifacts
+        const addResponse = await client.postArtifacts({ artifacts });
+        if (addResponse && 'taskId' in addResponse) {
+          await client.waitForTask((addResponse as TaskResponse).taskId);
+        }
+
+        // Step 2: Publish artifacts
+        const pubResponse = await client.postArtifactsPublish(publishPayload);
+        if (pubResponse && 'taskId' in pubResponse) {
+          const result = await client.waitForTask((pubResponse as TaskResponse).taskId);
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ status: 'Deployed', result }, null, 2) }],
+          };
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ status: 'Deployed', result: pubResponse }, null, 2) }],
+        };
+      }
+
       case 'rotate_metadata': {
         const payload = args?.payload;
         if (!payload) throw new Error('Missing required argument: payload');
-        const response = await client.postMetadata(payload) as any;
-        if (response.taskId) {
-          const result = await client.waitForTask(response.taskId);
+        const response = await client.postMetadata(payload);
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
@@ -239,9 +295,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'add_signature': {
         const payload = args?.payload;
         if (!payload) throw new Error('Missing required argument: payload');
-        const response = await client.postMetadataSign(payload) as any;
-        if (response.taskId) {
-          const result = await client.waitForTask(response.taskId);
+        const response = await client.postMetadataSign(payload);
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
@@ -254,9 +310,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'update_config': {
         const payload = args?.payload;
         if (!payload) throw new Error('Missing required argument: payload');
-        const response = await client.putConfig(payload) as any;
-        if (response.taskId) {
-          const result = await client.waitForTask(response.taskId);
+        const response = await client.putConfig(payload);
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };
@@ -281,9 +337,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error(`Invalid action: ${action}. Must be 'create', 'update', or 'delete'.`);
         }
 
-        const taskResponse = response as any;
-        if (taskResponse.taskId) {
-          const result = await client.waitForTask(taskResponse.taskId);
+        if (response && 'taskId' in response) {
+          const result = await client.waitForTask((response as TaskResponse).taskId);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           };

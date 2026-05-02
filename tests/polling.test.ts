@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { RstufClient } from '../src/client';
+import { RstufClient } from '../src/client.js';
 import axios from 'axios';
 
 // Complete axios mock
@@ -15,6 +15,7 @@ jest.mock('axios', () => ({
     create: mockCreate,
   },
   create: mockCreate,
+  isAxiosError: (err: any) => err.__isAxiosError === true,
 }));
 
 describe('RstufClient waitForTask', () => {
@@ -27,7 +28,7 @@ describe('RstufClient waitForTask', () => {
   });
 
   it('should resolve when task state is SUCCESS', async () => {
-    mockRequest
+    (mockRequest as any)
       .mockResolvedValueOnce({ data: { state: 'PENDING' } })
       .mockResolvedValueOnce({ data: { state: 'PENDING' } })
       .mockResolvedValueOnce({ data: { state: 'SUCCESS', result: { success: true } } });
@@ -38,13 +39,13 @@ describe('RstufClient waitForTask', () => {
   }, 15000);
 
   it('should throw when task state is FAILED', async () => {
-    mockRequest.mockResolvedValueOnce({ data: { state: 'FAILED', error: 'Something went wrong' } });
+    (mockRequest as any).mockResolvedValueOnce({ data: { state: 'FAILED', error: 'Something went wrong' } });
 
     await expect(client.waitForTask('task-123', 10000, 10)).rejects.toThrow('Task task-123 failed: Something went wrong');
   });
 
   it('should throw when task times out', async () => {
-    mockRequest.mockResolvedValue({ data: { state: 'PENDING' } });
+    (mockRequest as any).mockResolvedValue({ data: { state: 'PENDING' } });
 
     await expect(client.waitForTask('task-123', 100, 10)).rejects.toThrow('Task task-123 timed out after 100ms');
   });
